@@ -1,4 +1,4 @@
-function [Q, V, Cvx, H] = CharTester(data, index, D, dz)
+function [Qsmooth, Usmooth, Csmooth, Hsmooth] = CharTester(data, index, D, dz)
 Q = double.empty;
 V = double.empty;
 Cvx = double.empty;
@@ -9,6 +9,11 @@ for i=1:size(data,1)
     V(i,:) = getSaltationVelocity(data(i), index, D);
     Cvx(i,:) = getAirborneConcentrationByVx(data(i),index, dz);
     H(i,:) = getH50(data(i), index, D);
+    
+    Qsmooth = smoothdata(Q(i,:));
+    Usmooth = smoothdata(V(i,:));
+    Csmooth = smoothdata(Cvx(i,:));
+    Hsmooth = smoothdata(H(i,:));
 end
 end
  
