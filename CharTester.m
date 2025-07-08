@@ -94,14 +94,11 @@ for t=1:c
     indexz0 = find(max(VelocityX(:,t)-ux_c,0),1);
     display(['indexz0=',num2str(indexz0)]);
     
-    if mod(indexz0,1) == 0%判断Indexz0是不是整数(有无找到indexz0)
+    if mod(indexz0,1) == 0
         cumulative_sum = cumsum(Flux(indexz0:end,t));
-        % 计算总和
         total_sum = cumulative_sum(end);
-        % 计算每个元素在总和中所占的比例
         percentages = cumulative_sum / total_sum;
         index50=find(max(percentages-0.5,0),1);
-        %display(['index50=',num2str(index50)]);
         H50(t)=z(index50+indexz0-1)-z(indexz0-1);%/D;%non-dimensionalize
     else
         H50(t)=0;
