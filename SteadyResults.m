@@ -208,12 +208,16 @@ set(gca,'FontSize',14);
 ylim([-0.0001 0.045]);
 
 
-function idx0 = steady_start_within15_afterpeak(x)
-% Return the starting index (1-based) of the last-longest segment whose
-% values stay within 10% of the average of the last 100 samples of x,
-% constrained to start after the global peak.
+function idx0 = steady_start_within15_afterpeak(x, t_or_dt)
+% STEADY_START_WITHIN15_AFTERPEAK
+%   idx0 = steady_start_within15_afterpeak(x)
+%   idx0 = steady_start_within15_afterpeak(x, t)      % t: time vector (s)
+%   idx0 = steady_start_within15_afterpeak(x, dt)     % dt: scalar time step (s)
 %
-%   idx0 = steady_start_within10_afterpeak(x)
+% Returns the FIRST index (1-based) *after the global peak* where x enters
+% the band ±15% around the mean of the last 1.5 s of data.
+%
+% If t_or_dt is omitted, the last-1.5 s window defaults to the last 150 samples.
 
     x = x(:);
     N = numel(x);
@@ -221,36 +225,50 @@ function idx0 = steady_start_within15_afterpeak(x)
         idx0 = NaN; return;
     end
 
-    % --- average over the last up-to-100 samples ---
-    k = min(150, N);
-    xbar = mean(x(N-k+1:N));
+    % --- number of samples in the last 1.5 s ---
+    if nargin < 2 || isempty(t_or_dt)
+        k = min(150, N);  % default: 150 samples (~1.5 s at 100 Hz)
+    else
+        if isscalar(t_or_dt)                   % dt provided
+            dt = t_or_dt;
+            if ~isfinite(dt) || dt <= 0
+                k = min(150, N);
+            else
+                k = max(1, min(N, round(1.5 / dt)));
+            end
+        else                                   % time vector provided
+            t = t_or_dt(:);
+            if numel(t) == N
+                k = sum(t >= t(end) - 1.5);
+                k = max(1, min(N, k));
+            else
+                k = min(150, N);
+            end
+        end
+    end
 
-    % --- 15% relative band around that average ---
+    % --- average over the last 1.5 s (k samples) ---
+    xbar = mean(x(N - k + 1 : N));
+
+    % --- ±15% band around that average ---
     tol = 0.15 * abs(xbar);
     if tol == 0
-        mask = (x == 0);
+        inBand = (x == 0);     % degenerate case if xbar==0
     else
-        mask = abs(x - xbar) <= tol;
+        inBand = abs(x - xbar) <= tol;
     end
 
-    % --- enforce "after the peak" (use last occurrence of the global max) ---
+    % --- find last occurrence of the global maximum (peak) ---
     [~, imax_first] = max(x);
-    imax = find(x == x(imax_first), 1, 'last');  % robust to flat maxima
-    mask(1:imax) = false;
+    imax = find(x == x(imax_first), 1, 'last');
 
-    % --- find contiguous true-runs in mask ---
-    d = diff([false; mask; false]);
-    starts = find(d == 1);
-    ends   = find(d == -1) - 1;
+    % --- first index AFTER the peak that enters the band ---
+    idx_candidates = find(inBand & ( (1:N).' > imax ), 1, 'first');
 
-    if isempty(starts)
-        idx0 = NaN;  % no qualifying segment after the peak
-        return;
+    if isempty(idx_candidates)
+        idx0 = NaN;     % never enters the band after the peak
+    else
+        idx0 = idx_candidates;
     end
-
-    % --- choose the last-longest segment (tie-break favors later start) ---
-    lens = ends - starts + 1;
-    [~, kbest] = max(lens + starts/1e9);
-    idx0 = starts(kbest);
 end
 
